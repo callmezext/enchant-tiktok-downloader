@@ -1,0 +1,28 @@
+{
+  "name": "enchant-downloader",
+  "version": "1.0.0",
+  "description": "Enchant Downloader - TikTok Super HD Video Downloader (No Watermark)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "tiktok",
+    "downloader",
+    "super-hd",
+    "no-watermark"
+  ],
+  "author": "Antigravity",
+  "license": "ISC",
+  "dependencies": {
+    "@innovatorssoft/store-sqlite": "^1.0.2",
+    "archiver": "^7.0.1",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ssh2": "^1.17.0",
+    "ws": "^8.21.3",
+    "zapo-js": "^1.8.0"
+  }
+}

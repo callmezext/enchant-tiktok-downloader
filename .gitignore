@@ -1,0 +1,5 @@
+node_modules/
+wa_session/
+*.log
+.env
+.DS_Store

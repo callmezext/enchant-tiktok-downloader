@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — Enchant WhatsApp Bot Manager</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2325d366'><path d='M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z'/></svg>">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" />
+  
+  <style>
+    :root {
+      --bg-dark: #0b060d;
+      --bg-card: rgba(24, 13, 27, 0.85);
+      --border-color: rgba(255, 42, 122, 0.22);
+      --primary-pink: #ff2a7a;
+      --wa-green: #25d366;
+      --wa-dark: #128c7e;
+      --text-main: #fff1f5;
+      --text-muted: #fda4af;
+      --text-dim: #9f7382;
+      --radius: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding: 20px; }
+
+    .admin-container { max-width: 900px; margin: 0 auto; }
+    .hidden { display: none !important; }
+
+    /* Login Box */
+    .login-wrapper {
+      min-height: 80vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 30px rgba(255, 42, 122, 0.2);
+      padding: 32px;
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .login-icon { font-size: 36px; color: var(--primary-pink); margin-bottom: 12px; }
+    .login-card h2 { font-family: 'Outfit', sans-serif; font-size: 22px; margin-bottom: 6px; }
+    .login-card p { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+    .input-field {
+      width: 100%;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border-color);
+      padding: 12px 16px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      margin-bottom: 16px;
+      outline: none;
+    }
+    .input-field:focus { border-color: var(--primary-pink); }
+    .btn-login {
+      width: 100%;
+      background: linear-gradient(135deg, #ff2a7a 0%, #f43f5e 100%);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-login:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* Dashboard */
+    .dash-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 24px;
+    }
+    .dash-brand { display: flex; align-items: center; gap: 12px; }
+    .dash-brand i { font-size: 24px; color: var(--wa-green); }
+    .dash-brand h1 { font-family: 'Outfit', sans-serif; font-size: 20px; }
+    .btn-logout {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .grid-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    @media(min-width: 768px) {
+      .grid-cards { grid-template-columns: 1fr 1fr; }
+    }
+
+    .dash-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .full-col { grid-column: 1 / -1; }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      color: #fff;
+    }
+    .card-title i { color: var(--primary-pink); margin-right: 6px; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .status-online { background: rgba(37, 211, 102, 0.2); border: 1px solid var(--wa-green); color: var(--wa-green); }
+    .status-connecting { background: rgba(251, 191, 36, 0.2); border: 1px solid #fbbf24; color: #fbbf24; }
+    .status-offline { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; }
+
+    .qr-box {
+      text-align: center;
+      padding: 16px;
+      background: #ffffff;
+      border-radius: 12px;
+      max-width: 250px;
+      margin: 0 auto;
+    }
+    .qr-img { width: 100%; height: auto; display: block; }
+    .qr-hint { font-size: 12px; color: var(--text-dim); text-align: center; }
+
+    .btn-group { display: flex; gap: 10px; }
+    .btn-sm {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-wa { background: var(--wa-green); color: #fff; }
+    .btn-restart { background: rgba(255, 42, 122, 0.2); border: 1px solid var(--primary-pink); color: #fff; }
+    .btn-disconnect { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; }
+
+    /* Sessions Table */
+    .table-responsive { overflow-x: auto; max-height: 280px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 11px; text-transform: uppercase; }
+    td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .code-badge { background: rgba(255, 42, 122, 0.2); padding: 3px 8px; border-radius: 6px; font-family: monospace; font-weight: 700; color: var(--primary-pink); }
+
+    /* Server Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .stat-metric-card {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stat-metric-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .stat-metric-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .stat-metric-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff2a7a, #38bdf8);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    /* Logs Box */
+    .logs-box {
+      background: #060307;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .log-item { display: flex; gap: 8px; }
+    .log-time { color: var(--text-dim); }
+    .log-info { color: #38bdf8; }
+    .log-error { color: #f87171; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-container">
+    <!-- Login Section -->
+    <div id="loginView" class="login-wrapper">
+      <div class="login-card">
+        <i class="fa-solid fa-shield-halved login-icon"></i>
+        <h2>Enchant Bot Admin</h2>
+        <p>Masukkan password admin untuk mengelola koneksi WhatsApp Bot.</p>
+        <input type="password" id="adminPassword" class="input-field" placeholder="Password Admin (Wangy321)" />
+        <button id="loginBtn" class="btn-login" type="button">
+          <i class="fa-solid fa-lock-open"></i> Masuk Dashboard
+        </button>
+        <div id="loginError" style="color: #ef4444; font-size: 12px; margin-top: 10px;" class="hidden">Password salah!</div>
+      </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashView" class="hidden">
+      <header class="dash-header">
+        <div class="dash-brand">
+          <i class="fa-brands fa-whatsapp"></i>
+          <div>
+            <h1>Enchant WhatsApp Bot Manager</h1>
+            <div style="font-size: 12px; color: var(--text-dim);">Engine: Zapo-JS Ultra-Lightweight WA Client</div>
+          </div>
+        </div>
+        <button id="logoutBtn" class="btn-logout" type="button">
+          <i class="fa-solid fa-right-from-bracket"></i> Keluar
+        </button>
+      </header>
+
+      <div class="grid-cards">
+        <!-- Live Server Health & Stats Card -->
+        <div class="dash-card full-col">
+          <div class="card-title">
+            <span><i class="fa-solid fa-server"></i> Statistik & Performa Server</span>
+            <span id="serverUptimeBadge" style="font-size: 11px; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 10px; border-radius: 999px; font-weight: 700;">Memuat...</span>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-metric-card">
+              <div class="stat-metric-label"><i class="fa-solid fa-microchip"></i> CPU Cores & Model</div>
+              <div class="stat-metric-value" id="statCpu">-</div>
+              <div class="stat-metric-sub" id="statLoad">Load Avg: -</div>
+            </div>
+            <div class="stat-metric-card">
+              <div class="stat-metric-label"><i class="fa-solid fa-memory"></i> RAM Usage</div>
+              <div class="stat-metric-value" id="statRam">-</div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" id="statRamBar" style="width: 0%;"></div></div>
+              <div class="stat-metric-sub" id="statRamSub" style="margin-top: 4px;">-</div>
+            </div>
+            <div class="stat-metric-card">
+              <div class="stat-metric-label"><i class="fa-solid fa-hard-drive"></i> Disk Storage</div>
+              <div class="stat-metric-value" id="statDisk">-</div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" id="statDiskBar" style="width: 0%;"></div></div>
+              <div class="stat-metric-sub" id="statDiskSub" style="margin-top: 4px;">-</div>
+            </div>
+            <div class="stat-metric-card">
+              <div class="stat-metric-label"><i class="fa-brands fa-node-js"></i> Runtime & OS</div>
+              <div class="stat-metric-value" id="statNode">-</div>
+              <div class="stat-metric-sub" id="statOs">-</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bot Status Card -->
+        <div class="dash-card">
+          <div class="card-title">
+            <span><i class="fa-solid fa-signal"></i> Status Koneksi Bot</span>
+            <span id="botStatusBadge" class="status-badge status-offline">Offline</span>
+          </div>
+
+          <div id="qrContainer" class="hidden">
+            <div class="qr-box">
+              <img id="qrImage" src="" class="qr-img" alt="Scan QR WhatsApp">
+            </div>
+            <p class="qr-hint" style="margin-top: 10px;">
+              Buka WhatsApp di HP &gt; <b>Perangkat Tertaut (Linked Devices)</b> &gt; <b>Tautkan Perangkat</b> lalu scan QR di atas.
+            </p>
+
+            <div id="pairingCodeBox" style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed rgba(255,255,255,0.15);">
+              <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;">
+                <i class="fa-solid fa-key"></i> Atau Tautkan dengan 8-Digit Kode Telepon (Tanpa Kamera)
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 6px;">
+                <input type="text" id="pairingPhoneInput" class="input-field" placeholder="Nomor WA (contoh: 6285713150253)" style="font-size: 12px; padding: 8px 12px; margin-bottom: 0;" />
+                <button id="btnGetPairingCode" class="btn-sm btn-wa" style="white-space: nowrap;" type="button">
+                  <i class="fa-solid fa-paper-plane"></i> Minta Kode
+                </button>
+              </div>
+              <div id="pairingResult" class="hidden" style="margin-top: 10px; padding: 12px; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Kode Pairing WhatsApp Anda:</div>
+                <div id="pairingCodeDisplay" style="font-size: 24px; font-weight: 800; color: #38bdf8; letter-spacing: 4px; margin: 6px 0; font-family: monospace;">----</div>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                  Buka WhatsApp &gt; Perangkat Tertaut &gt; Tautkan Perangkat &gt; <b>Tautkan dengan nomor telepon saja</b> &gt; Masukkan kode di atas.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="connectedBox" class="hidden" style="text-align: center; padding: 20px 0;">
+            <i class="fa-solid fa-circle-check" style="font-size: 48px; color: var(--wa-green); margin-bottom: 10px;"></i>
+            <h3 style="font-size: 16px;">WhatsApp Bot Aktif 24/7!</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Bot siap menerima pesan kode unik <b>ENCHANT-TIKTOK-XXXXXX</b> dari pengunjung.</p>
+          </div>
+
+          <div class="btn-group" style="flex-wrap: wrap;">
+            <button id="btnRestart" class="btn-sm btn-restart" type="button">
+              <i class="fa-solid fa-rotate"></i> Muat Ulang
+            </button>
+            <button id="btnReset" class="btn-sm btn-wa" style="background: #e11d48;" type="button">
+              <i class="fa-solid fa-qrcode"></i> Scan Ulang QR
+            </button>
+            <button id="btnDisconnect" class="btn-sm btn-disconnect" type="button">
+              <i class="fa-solid fa-power-off"></i> Disconnect
+            </button>
+          </div>
+        </div>
+
+        <!-- Bot Settings Card -->
+        <div class="dash-card">
+          <div class="card-title">
+            <span><i class="fa-solid fa-gear"></i> Nomor WhatsApp Bot</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted);">
+            Nomor ini yang akan dibuka saat pengunjung di website mengklik tombol <b>"Kirim ke WhatsApp"</b>.
+          </p>
+          <div>
+            <label style="font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Nomor WhatsApp (dengan kode negara)</label>
+            <input type="text" id="botPhoneInput" class="input-field" placeholder="Contoh: 6281234567890" style="margin-top: 4px;" />
+            <button id="btnSavePhone" class="btn-sm btn-wa" style="width: 100%;" type="button">
+              <i class="fa-solid fa-floppy-disk"></i> Simpan Nomor Bot
+            </button>
+          </div>
+          <div id="savePhoneToast" style="color: var(--wa-green); font-size: 12px;" class="hidden">
+            <i class="fa-solid fa-check"></i> Nomor WhatsApp berhasil disimpan!
+          </div>
+        </div>
+
+        <!-- Live Sessions Card -->
+        <div class="dash-card full-col">
+          <div class="card-title">
+            <span><i class="fa-solid fa-list-check"></i> Sesi Video Aktif (Live Codes)</span>
+            <span id="sessionCountBadge" style="font-size: 12px; color: var(--primary-pink); font-weight: 700;">0 Sesi</span>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kode Sesi (ID Unik)</th>
+                  <th>Judul Video</th>
+                  <th>Kreator</th>
+                  <th>Waktu Dibuat</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="sessionTableBody">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Belum ada video yang diproses.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Logs Card -->
+        <div class="dash-card full-col">
+          <div class="card-title">
+            <span><i class="fa-solid fa-terminal"></i> Log Aktivitas WhatsApp Bot</span>
+            <button id="btnRefreshLogs" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px;">
+              <i class="fa-solid fa-arrows-rotate"></i> Refresh
+            </button>
+          </div>
+          <div id="logsBox" class="logs-box">
+            <div class="log-item"><span class="log-time">[System]</span> <span class="log-info">Menunggu aktivitas bot...</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let authToken = localStorage.getItem('enchant_admin_token') || '';
+
+    const loginView = document.getElementById('loginView');
+    const dashView = document.getElementById('dashView');
+    const adminPassword = document.getElementById('adminPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    const botStatusBadge = document.getElementById('botStatusBadge');
+    const qrContainer = document.getElementById('qrContainer');
+    const qrImage = document.getElementById('qrImage');
+    const connectedBox = document.getElementById('connectedBox');
+    const btnRestart = document.getElementById('btnRestart');
+    const btnReset = document.getElementById('btnReset');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+
+    const botPhoneInput = document.getElementById('botPhoneInput');
+    const btnSavePhone = document.getElementById('btnSavePhone');
+    const savePhoneToast = document.getElementById('savePhoneToast');
+    const sessionTableBody = document.getElementById('sessionTableBody');
+    const sessionCountBadge = document.getElementById('sessionCountBadge');
+    const logsBox = document.getElementById('logsBox');
+    const btnRefreshLogs = document.getElementById('btnRefreshLogs');
+
+    let statusPollInterval = null;
+
+    // Login Handler
+    loginBtn.addEventListener('click', async () => {
+      const password = adminPassword.value.trim();
+      if (!password) return;
+
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          authToken = data.token;
+          localStorage.setItem('enchant_admin_token', authToken);
+          showDashboard();
+        } else {
+          loginError.classList.remove('hidden');
+        }
+      } catch (err) {
+        loginError.textContent = 'Gagal menghubungi server.';
+        loginError.classList.remove('hidden');
+      }
+    });
+
+    adminPassword.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') loginBtn.click();
+    });
+
+    logoutBtn.addEventListener('click', () => {
+      authToken = '';
+      localStorage.removeItem('enchant_admin_token');
+      clearInterval(statusPollInterval);
+      loginView.classList.remove('hidden');
+      dashView.classList.add('hidden');
+    });
+
+    function showDashboard() {
+      loginView.classList.add('hidden');
+      dashView.classList.remove('hidden');
+      fetchStatus();
+      if (!statusPollInterval) {
+        statusPollInterval = setInterval(fetchStatus, 3000);
+      }
+    }
+
+    // Fetch Status from API
+    async function fetchStatus() {
+      if (!authToken) return;
+      try {
+        const res = await fetch('/api/admin/bot-status', {
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (res.status === 401) {
+          logoutBtn.click();
+          return;
+        }
+        const data = await res.json();
+        renderDashboard(data);
+      } catch (e) {}
+    }
+
+    function renderDashboard(data) {
+      if (!data) return;
+
+      // Status Badge & QR
+      if (data.status === 'connected') {
+        botStatusBadge.className = 'status-badge status-online';
+        botStatusBadge.textContent = '🟢 Online / Connected';
+        qrContainer.classList.add('hidden');
+        connectedBox.classList.remove('hidden');
+      } else if (data.status === 'connecting' && data.qrDataUrl) {
+        botStatusBadge.className = 'status-badge status-connecting';
+        botStatusBadge.textContent = '🟡 Scan QR Code';
+        qrImage.src = data.qrDataUrl;
+        qrContainer.classList.remove('hidden');
+        connectedBox.classList.add('hidden');
+      } else {
+        botStatusBadge.className = 'status-badge status-offline';
+        botStatusBadge.textContent = '🔴 Disconnected';
+        qrContainer.classList.add('hidden');
+        connectedBox.classList.add('hidden');
+      }
+
+      // Server Stats
+      if (data.serverStats) {
+        const s = data.serverStats;
+        document.getElementById('serverUptimeBadge').textContent = `Uptime: ${s.serverUptime || 'Online'}`;
+        document.getElementById('statCpu').textContent = `${s.cpuCores} Cores`;
+        document.getElementById('statLoad').textContent = `Load Avg: ${s.loadAvg}`;
+
+        document.getElementById('statRam').textContent = s.memory.used;
+        document.getElementById('statRamBar').style.width = s.memory.percent;
+        document.getElementById('statRamSub').textContent = `${s.memory.percent} dari ${s.memory.total}`;
+
+        document.getElementById('statDisk').textContent = s.disk.used !== 'N/A' ? s.disk.used : 'OK';
+        document.getElementById('statDiskBar').style.width = s.disk.percent !== 'N/A' ? s.disk.percent : '40%';
+        document.getElementById('statDiskSub').textContent = s.disk.total !== 'N/A' ? `${s.disk.percent} dari ${s.disk.total}` : `Tersedia: ${s.disk.free || 'OK'}`;
+
+        document.getElementById('statNode').textContent = s.nodeVersion;
+        document.getElementById('statOs').textContent = s.platform;
+      }
+
+      // Phone Input
+      if (!botPhoneInput.matches(':focus') && data.botPhoneNumber) {
+        botPhoneInput.value = data.botPhoneNumber;
+      }
+
+      // Sessions List
+      sessionCountBadge.textContent = `${data.sessions?.length || 0} Sesi Aktif`;
+      if (data.sessions && data.sessions.length > 0) {
+        sessionTableBody.innerHTML = data.sessions.map(s => `
+          <tr>
+            <td><span class="code-badge">${s.code}</span></td>
+            <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${s.title || 'TikTok Video'}</td>
+            <td>@${s.author || 'user'}</td>
+            <td>${s.timeAgo || 'Baru saja'}</td>
+            <td><span style="color: var(--wa-green); font-weight: 600;">Aktif (24h)</span></td>
+          </tr>
+        `).join('');
+      } else {
+        sessionTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Belum ada video yang diproses.</td></tr>`;
+      }
+
+      // Logs
+      if (data.logs && data.logs.length > 0) {
+        logsBox.innerHTML = data.logs.map(l => `
+          <div class="log-item">
+            <span class="log-time">[${l.time}]</span>
+            <span class="log-${l.type}">${l.msg}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Bot Action Buttons
+    btnRestart.addEventListener('click', async () => {
+      await fetch('/api/admin/bot-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'restart' })
+      });
+      fetchStatus();
+    });
+
+    btnReset.addEventListener('click', async () => {
+      if (!confirm('Apakah Anda yakin ingin mereset sesi dan memindai (scan) ulang QR Code?')) return;
+      await fetch('/api/admin/bot-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'reset' })
+      });
+      fetchStatus();
+    });
+
+    btnDisconnect.addEventListener('click', async () => {
+      await fetch('/api/admin/bot-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ action: 'disconnect' })
+      });
+      fetchStatus();
+    });
+
+    // Save Phone
+    btnSavePhone.addEventListener('click', async () => {
+      const number = botPhoneInput.value.trim();
+      if (!number) return;
+
+      const res = await fetch('/api/admin/update-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ waBotNumber: number })
+      });
+      if (res.ok) {
+        savePhoneToast.classList.remove('hidden');
+        setTimeout(() => savePhoneToast.classList.add('hidden'), 3000);
+      }
+    });
+
+    // Request Pairing Code
+    const btnGetPairingCode = document.getElementById('btnGetPairingCode');
+    const pairingPhoneInput = document.getElementById('pairingPhoneInput');
+    const pairingResult = document.getElementById('pairingResult');
+    const pairingCodeDisplay = document.getElementById('pairingCodeDisplay');
+
+    if (btnGetPairingCode) {
+      btnGetPairingCode.addEventListener('click', async () => {
+        const phone = (pairingPhoneInput.value || botPhoneInput.value || '').trim();
+        if (!phone) {
+          alert('Masukkan nomor WhatsApp terlebih dahulu!');
+          return;
+        }
+        btnGetPairingCode.disabled = true;
+        btnGetPairingCode.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Meminta...';
+        try {
+          const res = await fetch('/api/admin/request-pairing-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ phoneNumber: phone })
+          });
+          const data = await res.json();
+          if (data.success && data.code) {
+            pairingCodeDisplay.textContent = data.code;
+            pairingResult.classList.remove('hidden');
+          } else {
+            alert('Gagal mendapatkan kode pairing: ' + (data.message || 'Silakan scan QR'));
+          }
+        } catch (e) {
+          alert('Error: ' + e.message);
+        } finally {
+          btnGetPairingCode.disabled = false;
+          btnGetPairingCode.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Minta Kode';
+        }
+      });
+    }
+
+    btnRefreshLogs.addEventListener('click', fetchStatus);
+
+    // Auto-login if token exists
+    if (authToken) {
+      showDashboard();
+    }
+  </script>
+</body>
+</html>
