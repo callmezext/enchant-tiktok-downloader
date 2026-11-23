@@ -536,6 +536,11 @@
         qrImage.src = data.qrDataUrl;
         qrContainer.classList.remove('hidden');
         connectedBox.classList.add('hidden');
+      } else if (data.status === 'connecting') {
+        botStatusBadge.className = 'status-badge status-connecting';
+        botStatusBadge.textContent = '🟡 Menyiapkan QR Code...';
+        qrContainer.classList.add('hidden');
+        connectedBox.classList.add('hidden');
       } else {
         botStatusBadge.className = 'status-badge status-offline';
         botStatusBadge.textContent = '🔴 Disconnected';
@@ -595,33 +600,41 @@
     }
 
     // Bot Action Buttons
-    btnRestart.addEventListener('click', async () => {
-      await fetch('/api/admin/bot-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ action: 'restart' })
-      });
-      fetchStatus();
-    });
+    async function runBotAction(btn, action) {
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+      try {
+        const res = await fetch('/api/admin/bot-action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ action })
+        });
+        if (res.status === 401) {
+          logoutBtn.click();
+          return;
+        }
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          alert('Gagal menjalankan aksi: ' + (data.message || 'Server error'));
+        }
+      } catch (e) {
+        alert('Gagal menghubungi server: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        fetchStatus();
+      }
+    }
 
-    btnReset.addEventListener('click', async () => {
+    btnRestart.addEventListener('click', () => runBotAction(btnRestart, 'restart'));
+
+    btnReset.addEventListener('click', () => {
       if (!confirm('Apakah Anda yakin ingin mereset sesi dan memindai (scan) ulang QR Code?')) return;
-      await fetch('/api/admin/bot-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ action: 'reset' })
-      });
-      fetchStatus();
+      runBotAction(btnReset, 'reset');
     });
 
-    btnDisconnect.addEventListener('click', async () => {
-      await fetch('/api/admin/bot-action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ action: 'disconnect' })
-      });
-      fetchStatus();
-    });
+    btnDisconnect.addEventListener('click', () => runBotAction(btnDisconnect, 'disconnect'));
 
     // Save Phone
     btnSavePhone.addEventListener('click', async () => {

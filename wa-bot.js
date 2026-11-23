@@ -34,6 +34,22 @@ function extractTextFromMessage(message) {
   );
 }
 
+function hasSavedSqliteAuth(sqlitePath) {
+  try {
+    if (!fs.existsSync(sqlitePath)) return false;
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(sqlitePath, { readOnly: true });
+    try {
+      const row = db.prepare("SELECT me_jid FROM auth_credentials WHERE me_jid IS NOT NULL AND me_jid != '' LIMIT 1").get();
+      return !!(row && row.me_jid);
+    } finally {
+      db.close();
+    }
+  } catch (_) {
+    return false;
+  }
+}
+
 class WhatsAppBotManager {
   constructor(options = {}) {
     this.sessionDir = options.sessionDir || path.join(__dirname, 'wa_session');
@@ -80,38 +96,59 @@ class WhatsAppBotManager {
     this.log(`Nomor WhatsApp Bot diatur ke: +${this.botPhoneNumber}`);
   }
 
-  async init() {
-    if (this.status === 'connected') return;
+  async init(options = {}) {
+    const forceQr = !!options.forceQr;
+    if (this.status === 'connected' && !forceQr) return;
+    if (this._isStarting) return;
+
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+
+    const hasPaired = hasSavedSqliteAuth(this.sqlitePath);
+    if (!forceQr && !hasPaired) {
+      this.status = 'disconnected';
+      this.qrDataUrl = null;
+      this.pairingCode = null;
+      this.log('Mode Standby (belum ada sesi login). Klik Hubungkan / Scan QR di WA Panel untuk menautkan nomor.');
+      return;
+    }
+
+    this._isStarting = true;
+    this._manualStop = false;
+    if (!this._pairingReadyWaiters) this._pairingReadyWaiters = [];
+
+    const notifyReady = () => {
+      const list = (this._pairingReadyWaiters || []).splice(0);
+      for (const r of list) { try { r(true); } catch (_) {} }
+    };
 
     try {
+      if (this.client) {
+        try { await this.client.disconnect(); } catch (_) {}
+        this.client = null;
+      }
       this.status = 'connecting';
+      this.qrDataUrl = null;
+      this.pairingCode = null;
       this.log('Menginisialisasi WhatsApp Bot dengan persistent SQLite database...');
 
       const sqliteBackend = createSqliteStore({ path: this.sqlitePath });
       this.store = createStore({
         backends: { sqlite: sqliteBackend },
         providers: {
-          auth: 'sqlite',
-          signal: 'sqlite',
-          preKey: 'sqlite',
-          session: 'sqlite',
-          identity: 'sqlite',
-          senderKey: 'sqlite',
-          appState: 'sqlite',
-          messages: 'sqlite',
-          threads: 'sqlite',
-          contacts: 'sqlite',
-          privacyToken: 'sqlite'
+          auth: 'sqlite', signal: 'sqlite', preKey: 'sqlite', session: 'sqlite',
+          identity: 'sqlite', senderKey: 'sqlite', appState: 'sqlite',
+          messages: 'sqlite', threads: 'sqlite', contacts: 'sqlite', privacyToken: 'sqlite'
         }
       });
 
-      this.client = new WaClient({
-        store: this.store,
-        sessionId: 'enchant-wa-bot',
-        logger: createNoopLogger()
-      });
+      this.client = new WaClient(
+        { store: this.store, sessionId: 'enchant-wa-bot', recoverFromClientTooOld: true },
+        createNoopLogger()
+      );
 
-      // QR Code Event
       this.client.on('auth_qr', async ({ qr }) => {
         this.status = 'connecting';
         this.log('Menerima QR Code baru, silakan scan dari WhatsApp di HP.');
@@ -122,40 +159,97 @@ class WhatsAppBotManager {
             color: { dark: '#0b060d', light: '#ffffff' }
           });
         } catch (e) {
-          this.log(`Gagal render QR Code: ${e.message}`, 'error');
+          this.log('Gagal render QR Code: ' + e.message, 'error');
+        }
+        notifyReady();
+      });
+
+      this.client.on('auth_pairing_code', ({ code }) => {
+        this.pairingCode = code ? (code.match(/.{1,4}/g)?.join('-') || code) : null;
+      });
+
+      this.client.on('auth_pairing_required', async ({ forceManual }) => {
+        notifyReady();
+        if (forceManual && this.status !== 'connected') {
+          this.log('Batas waktu refresh QR habis, kembali ke mode Standby.');
+          await this.disconnect();
         }
       });
 
-      // Pairing Success & Auto-Save
-      this.client.on('auth_paired', (data) => {
+      this.client.on('auth_paired', ({ credentials }) => {
         this.status = 'connected';
         this.qrDataUrl = null;
+        this.pairingCode = null;
+        const meJid = credentials?.meJid || '';
+        this.connectedNumber = meJid.split('@')[0]?.split(':')[0] || null;
+        this.connectedName = credentials?.pushName || null;
+        if (this.connectedNumber) this.botPhoneNumber = this.connectedNumber;
         this.log('🎉 WhatsApp Bot BERHASIL TERHUBUNG & TERSIMPAN DI DATABASE!');
       });
 
-      // Connection State Changes
       this.client.on('connection', (conn) => {
-        if (conn?.connected) {
+        if (conn?.status === 'open' || conn?.connected) {
           this.status = 'connected';
           this.qrDataUrl = null;
+          this.pairingCode = null;
+          const creds = this.client?.getCredentials?.();
+          const meJid = creds?.meJid || '';
+          this.connectedNumber = meJid.split('@')[0]?.split(':')[0] || this.connectedNumber || null;
+          this.connectedName = creds?.pushName || this.connectedName || null;
+          if (this.connectedNumber) this.botPhoneNumber = this.connectedNumber;
           this.log('Status koneksi aktif / Online.');
+        } else if (conn?.status === 'close') {
+          if (conn.reason === 'failure_client_too_old') {
+            this.status = 'connecting';
+            this.log('Versi WA usang (405), mengambil versi terbaru & menyambung ulang...', 'warn');
+            return;
+          }
+          const wasPaired = hasSavedSqliteAuth(this.sqlitePath);
+          if (conn.isLogout) {
+            this.log('Perangkat di-logout dari HP, mereset sesi...', 'warn');
+            this.resetSession({ startQr: false }).catch(() => {});
+            return;
+          }
+          if (!this._manualStop && wasPaired) {
+            this.status = 'connecting';
+            this._reconnectTimer = setTimeout(() => {
+              if (!this._manualStop && this.status !== 'connected') {
+                this.init({ forceQr: false }).catch(() => {});
+              }
+            }, 4000);
+          } else if (!wasPaired) {
+            this.status = 'disconnected';
+            this.qrDataUrl = null;
+            if (!this._manualStop) {
+              this.log(`Koneksi terputus (${conn?.reason || 'closed'}, code: ${conn?.code ?? '-'})`, 'warn');
+            }
+          }
         }
       });
 
-      // Incoming WhatsApp Messages Handler
       this.client.on('message', async (msg) => {
         try {
           await this.handleIncomingMessage(msg);
         } catch (err) {
-          this.log(`Error handling message: ${err.message}`, 'error');
+          this.log('Error handling message: ' + err.message, 'error');
         }
       });
 
       await this.client.connect();
-      this.log('Koneksi WhatsApp Bot aktif.');
+      const creds = this.client?.getCredentials?.();
+      if (creds?.meJid) {
+        this.status = 'connected';
+        this.connectedNumber = creds.meJid.split('@')[0]?.split(':')[0] || null;
+        this.connectedName = creds.pushName || null;
+        if (this.connectedNumber) this.botPhoneNumber = this.connectedNumber;
+        this.qrDataUrl = null;
+        this.pairingCode = null;
+      }
     } catch (err) {
       this.status = 'disconnected';
-      this.log(`Gagal memulai bot: ${err.message}`, 'error');
+      this.log('Gagal memulai bot: ' + err.message, 'error');
+    } finally {
+      this._isStarting = false;
     }
   }
 
@@ -166,7 +260,7 @@ class WhatsAppBotManager {
     if (!senderJid) return;
 
     // Ignore group chats
-    if (senderJid.endsWith('@g.us')) return;
+    if (senderJid.endsWith('@g.us') || senderJid.endsWith('@broadcast') || senderJid.endsWith('@newsletter')) return;
 
     // Extract text from any message wrapper
     const messageContent = extractTextFromMessage(msg.message);
@@ -418,7 +512,7 @@ class WhatsAppBotManager {
           responseType: 'arraybuffer',
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Referer': 'https://www.tiktok.com/'
+            ...(videoUrl.includes('tiktok') ? { 'Referer': 'https://www.tiktok.com/' } : {})
           },
           timeout: 35000
         });
@@ -471,8 +565,18 @@ class WhatsAppBotManager {
   }
 
   async disconnect() {
+    this._manualStop = true;
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    if (this._pairingReadyWaiters) {
+      const list = this._pairingReadyWaiters.splice(0);
+      for (const r of list) { try { r(false); } catch (_) {} }
+    }
     this.status = 'disconnected';
     this.qrDataUrl = null;
+    this.pairingCode = null;
     if (this.client) {
       try {
         if (typeof this.client.disconnect === 'function') {
@@ -481,42 +585,64 @@ class WhatsAppBotManager {
       } catch (e) {}
       this.client = null;
     }
-    this.log('WhatsApp Bot telah diputuskan / disconnected.');
+    this.log('WhatsApp Bot telah diputuskan (Standby).');
   }
 
   async restart() {
     await this.disconnect();
-    await this.init();
+    await this.init({ forceQr: true });
   }
 
-  async resetSession() {
+  async resetSession(options = { startQr: false }) {
     await this.disconnect();
+    this.connectedNumber = null;
+    this.connectedName = null;
     try {
-      if (fs.existsSync(this.sqlitePath)) {
-        fs.unlinkSync(this.sqlitePath);
+      for (const suffix of ['', '-wal', '-shm']) {
+        const p = this.sqlitePath + suffix;
+        if (fs.existsSync(p)) fs.unlinkSync(p);
       }
-      this.log('Database sesi SQLite lama dibersihkan. Memulai sesi baru...');
+      this.log('Database sesi SQLite lama dibersihkan.');
     } catch (e) {
-      this.log(`Gagal menghapus file sesi: ${e.message}`, 'warn');
+      this.log('Gagal menghapus file sesi: ' + e.message, 'warn');
     }
-    await this.init();
+    if (options && options.startQr) {
+      await this.init({ forceQr: true });
+    }
   }
 
   async requestPairingCode(phoneNumber) {
-    if (!this.client || !this.client.auth) {
-      throw new Error('Client WhatsApp belum diinisialisasi.');
-    }
-    let cleaned = (phoneNumber || this.botPhoneNumber).replace(/[^0-9]/g, '');
+    let cleaned = String(phoneNumber || this.botPhoneNumber || '').replace(/[^0-9]/g, '');
     if (cleaned.startsWith('0')) cleaned = '62' + cleaned.slice(1);
+    if (!cleaned || cleaned.length < 8 || cleaned.includes('x')) {
+      throw new Error('Nomor WhatsApp tidak valid (contoh: 628123456789).');
+    }
 
-    this.log(`Meminta Pairing Code untuk nomor: +${cleaned}...`);
+    if (!this.client || this.status === 'disconnected') {
+      if (!this._pairingReadyWaiters) this._pairingReadyWaiters = [];
+      const waitReady = new Promise((resolve) => {
+        this._pairingReadyWaiters.push(resolve);
+        setTimeout(() => resolve(false), 9000);
+      });
+      await this.init({ forceQr: true });
+      if (!this.qrDataUrl) {
+        await waitReady;
+      }
+    }
+
+    if (!this.client || !this.client.auth) {
+      throw new Error('Client WhatsApp belum siap, coba klik Tampilkan QR terlebih dahulu.');
+    }
+
+    this.log('Meminta Pairing Code untuk nomor: +' + cleaned + '...');
     try {
-      const code = await this.client.auth.requestPairingCode(cleaned);
-      this.pairingCode = code;
-      this.log(`🎉 Pairing Code diterima: ${code}`);
-      return code;
+      const rawCode = await this.client.auth.requestPairingCode(cleaned);
+      const formatted = rawCode ? (rawCode.match(/.{1,4}/g)?.join('-') || rawCode) : rawCode;
+      this.pairingCode = formatted;
+      this.log('🎉 Pairing Code diterima: ' + formatted);
+      return formatted;
     } catch (err) {
-      this.log(`Gagal meminta Pairing Code: ${err.message}`, 'error');
+      this.log('Gagal meminta Pairing Code: ' + err.message, 'error');
       throw err;
     }
   }
@@ -527,7 +653,9 @@ class WhatsAppBotManager {
       connected: this.status === 'connected',
       qrDataUrl: this.qrDataUrl,
       pairingCode: this.pairingCode,
-      botPhoneNumber: this.botPhoneNumber,
+      botPhoneNumber: this.connectedNumber || this.botPhoneNumber,
+      connectedNumber: this.connectedNumber || null,
+      connectedName: this.connectedName || null,
       activeSessionsCount: this.videoSessions.size,
       logs: this.logs.slice(0, 20)
     };

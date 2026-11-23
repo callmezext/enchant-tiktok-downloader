@@ -401,16 +401,20 @@ app.get('/api/admin/bot-status', requireAdmin, (req, res) => {
 // API: Admin Bot Action (Connect / Disconnect / Restart)
 app.post('/api/admin/bot-action', requireAdmin, async (req, res) => {
   const { action } = req.body;
-  if (action === 'connect') {
-    await waBot.init();
-  } else if (action === 'disconnect') {
-    await waBot.disconnect();
-  } else if (action === 'restart') {
-    await waBot.restart();
-  } else if (action === 'reset') {
-    await waBot.resetSession();
+  try {
+    if (action === 'connect' || action === 'qr') {
+      await waBot.init({ forceQr: true });
+    } else if (action === 'disconnect') {
+      await waBot.disconnect();
+    } else if (action === 'restart') {
+      await waBot.restart();
+    } else if (action === 'reset') {
+      await waBot.resetSession({ startQr: true });
+    }
+    res.json({ success: true, status: waBot.getStatus() });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Gagal menjalankan aksi bot' });
   }
-  res.json({ success: true, status: waBot.getStatus() });
 });
 
 // API: Request WhatsApp 8-digit Pairing Code
@@ -468,6 +472,15 @@ app.get('/api/session/:code', (req, res) => {
     createdAt: session.createdAt,
     data: session
   });
+});
+// API: Internal register session from Enchant AIO
+app.post('/api/internal/register-session', (req, res) => {
+  const { sessionCode, data } = req.body;
+  if (!sessionCode || !data) {
+    return res.status(400).json({ success: false, message: 'Missing sessionCode or data' });
+  }
+  saveSession(sessionCode, { ...data, sessionCode, createdAt: Date.now() });
+  res.json({ success: true, sessionCode });
 });
 
 // API: Bot Query alternative endpoint: /api/bot/get-video?code=...
